@@ -224,8 +224,8 @@ Go to **GitHub → Your Repo → Settings → Secrets and Variables → Actions*
 | `ACR_LOGIN_SERVER` | ***Azure Portal → ACR -> Login Server** |
 | `ACR_USERNAME` | **Azure Portal → ACR → Settings -> Access Keys** |
 | `ACR_PASSWORD` | **Azure Portal → ACR → Settings -> Access Keys** |
-| `WEBAPP_NAME` | `demo-api` |
-| `RESOURCE_GROUP` | `MyResourceGroup` |
+| `WEBAPP_NAME` | Name of your Web App Service |
+| `RESOURCE_GROUP` | Name of your resource group |
 
 ---
 
@@ -237,35 +237,84 @@ name: Build and Deploy to Azure
 on:
   push:
     branches:
-      - main
+      - main  # Runs when pushing to main
+  pull_request:
+    branches:
+      - main  # Runs on PR merges to main
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write  # ✅ Allows GitHub to request an OpenID Connect (OIDC) token
+  contents: read   # ✅ Allows GitHub Actions to read the repo contents
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
+      # ✅ Step 1: Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v4
-      
-      - name: Build and Push Docker Image
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Grant execute permissions to Maven Wrapper
+        run: chmod +x mvnw
+
+      - name: Build JAR file
+        run: |
+          ./mvnw clean package -DskipTests
+
+      # ✅ Step 2: Log in to Azure
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ✅ Step 3: Log in to ACR (Azure Container Registry)
+      - name: Log in to ACR
+        run: |
+          echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
+
+      # ✅ Step 4: Build and Tag Docker Image (Use v1 instead of latest)
+      - name: Build Docker Image
         run: |
           IMAGE_TAG=v1
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/aspcicd:$IMAGE_TAG -f MyProject/Dockerfile MyProject/
-          docker push ${{ secrets.ACR_LOGIN_SERVER }}/aspcicd:$IMAGE_TAG
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/demo-api:$IMAGE_TAG .
+
+      # ✅ Step 5: Push the Docker Image to ACR (Use v1 instead of latest)
+      - name: Push Docker Image
+        run: |
+          IMAGE_TAG=v1
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/demo-api:$IMAGE_TAG
 
   deploy:
-    needs: build-and-push
+    needs: build-and-push  # Runs after the image is pushed to ACR
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Deploy to Azure Web App
+      # ✅ Step 6: Log in to Azure
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ✅ Step 7: Deploy to Azure App Service (Use v1 instead of latest)
+      - name: Deploy to Azure App Service
         run: |
-          az webapp config container set --name ${{ secrets.WEBAPP_NAME }} --resource-group ${{ secrets.RESOURCE_GROUP }} --docker-custom-image-name ${{ secrets.ACR_LOGIN_SERVER }}/aspcicd:v1
+          az webapp config container set --name ${{ secrets.WEBAPP_NAME }} \
+          --resource-group ${{ secrets.RESOURCE_GROUP }} \
+          --docker-custom-image-name ${{ secrets.ACR_LOGIN_SERVER }}/demo-api:v1
+          
           az webapp restart --name ${{ secrets.WEBAPP_NAME }} --resource-group ${{ secrets.RESOURCE_GROUP }}
+
 ```
 
 ---
@@ -295,4 +344,22 @@ Wait for the role to be assigned.
 
  ![Create Web App 2](./cicdscreenshots/Add%20federated%20client%20contributer%20role.png)
 
+
 🚀 **Now, every push automatically updates the deployment to Azure!**
+
+If you want to change the deployment to manual replace the on condition in the deploy.yml file
+
+on:
+  push:
+    branches:
+      - main  # Runs when pushing to main
+  pull_request:
+    branches:
+      - main  # Runs on PR merges to main
+
+      to
+
+on:
+  workflow_dispatch:
+
+``````
