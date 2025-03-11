@@ -274,4 +274,25 @@ Go to azure portal -> app registrations -> yourAppRegistrationName -> Federated 
 
  ![Create Web App 2](./cicdscreenshots/Add%20federated%20client.png)
 
+ Now, we need to assign the Contributor role to your service principal.
+
+Go to Azure Subscriptions.
+Click on your Subscription (where your resources are deployed).
+In the left menu, click "Access control (IAM)".
+Click "+ Add" → "Add role assignment".
+Select Role:
+In the Role tab, select Contributor.
+Assign Access To:
+Choose "User, group, or service principal".
+Select your Service Principal:
+Click "Select members".
+Search for your App Registration name (e.g., github-acr-spring-deploy).
+Select it and click "Next".
+Review and Assign:
+Click "Review + assign".
+Wait for the role to be assigned.
+✅ Now your Service Principal has Contributor permissions for the subscription!
+
+ ![Create Web App 2](./cicdscreenshots/Add%20federated%20client%20contributer%20role.png)
+
 🚀 **Now, every push automatically updates the deployment to Azure!**
